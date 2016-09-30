@@ -8,7 +8,7 @@ var db_conf = {
   password: 'dungeons',
   host: 'localhost',
   port: 5432,
-  max: 10,
+  max: 25,
 }
 
 var app = express()
