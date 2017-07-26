@@ -1,4 +1,3 @@
-var cors = require('cors')
 var express = require('express')
 var pg = require('pg')
 
@@ -12,8 +11,6 @@ var db_conf = {
 }
 
 var app = express()
-app.use(cors({origin:'http://dnd.dsierra.io'}))
-
 var pool = new pg.Pool(db_conf)
 
 // QUERIES
@@ -31,9 +28,17 @@ const SPELLS_UPTO_LEVEL_FOR_CLASS_ID = "select class_spells.spell,spells.name fr
 function doQuery(query, params, cb) {
   
   pool.connect(function(err, client, done) {
+
+    if(err) {
+      console.log(err)
+    }
     
     client.query(query, params, function(err, result) {
-      
+     
+      if(err) {
+        console.log(err)
+      }
+ 
       done()
       
       cb(result.rows)
@@ -158,9 +163,11 @@ function getSpellAttributes(spellId, cb) {
 }
 
 // HTTP
+// All requests return valid data assuming a valid input
+// Invalid data will result in an empty object/array being returned
 
 app.get('/classes', function(req, res) {
-  
+
   getClasses(function(results) {
     
     res.json(results)
@@ -188,6 +195,7 @@ app.get('/classes/all', function(req, res) {
         
         classes[id] = attribs
         
+        // make sure all async calls are done
         if(!--count) {
           
           res.json(classes)
