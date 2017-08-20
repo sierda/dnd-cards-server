@@ -1,3 +1,4 @@
+var cors = require('cors')
 var express = require('express')
 var pg = require('pg')
 
@@ -11,17 +12,20 @@ var db_conf = {
 }
 
 var app = express()
+app.use(cors({origin:['http://dnd.dsierra.io', 'http://dsierra.io', 'http://localhost:4200']}))
+
 var pool = new pg.Pool(db_conf)
 
 // QUERIES
 
-const SELECT_ALL_CLASSES = "SELECT (id) FROM classes"
-const GET_CLASS_ATTRIBUTES = "SELECT name FROM classes where id=$1::int";
-const SELECT_ALL_SPELLS = "SELECT (id) FROM spells";
-const GET_SPELL_ATTRIBUTES = "SELECT name, type, casting_time, range, components, duration, primary_description, level FROM spells where id=$1::int";
-const LEVELS_CLASS_GETS_SPELLS = "SELECT DISTINCT (level) from class_spells where class=$1::int order by level";
-const SPELLS_AT_LEVEL_FOR_CLASS_ID = "select class_spells.spell,spells.name from class_spells inner join spells on spells.id=class_spells.spell where class=$1::int and class_spells.level=$2::int order by spells.name";
-const SPELLS_UPTO_LEVEL_FOR_CLASS_ID = "select class_spells.spell,spells.name from class_spells inner join spells on spells.id=class_spells.spell where class=$1::int and class_spells.level<=$2::int order by spells.name";
+const SELECT_ALL_CLASSES = 'SELECT (id) FROM classes'
+const GET_CLASS_ATTRIBUTES = 'SELECT name FROM classes WHERE id=$1::int';
+const SELECT_ALL_SPELLS = 'SELECT (id) FROM spells';
+const SEARCH_SPELLS = ' SELECT id, name FROM spells WHERE name ILIKE $1 ORDER BY name';
+const GET_SPELL_ATTRIBUTES = 'SELECT name, type, casting_time, range, components, duration, primary_description, level FROM spells WHERE id=$1::int';
+const LEVELS_CLASS_GETS_SPELLS = 'SELECT DISTINCT (level) FROM class_spells WHERE class=$1::int ORDER BY level';
+const SPELLS_AT_LEVEL_FOR_CLASS_ID = 'SELECT class_spells.spell,spells.name FROM class_spells INNER JOIN spells ON spells.id=class_spells.spell WHERE class=$1::int AND class_spells.level=$2::int ORDER BY spells.name';
+const SPELLS_UPTO_LEVEL_FOR_CLASS_ID = 'SELECT class_spells.spell,spells.name FROM class_spells INNER JOIN spells ON spells.id=class_spells.spell WHERE class=$1::int AND class_spells.level<=$2::int ORDER BY spells.name';
 
 // SQL
 
@@ -38,7 +42,7 @@ function doQuery(query, params, cb) {
       if(err) {
         console.log(err)
       }
- 
+
       done()
       
       cb(result.rows)
@@ -138,6 +142,36 @@ function getSpells(cb) {
   })
 }
 
+function searchSpells(query, anywhere, cb) {
+
+  var spells = []
+  
+  if(query === null) {
+    
+    cb(spells)
+  }
+  
+  query = query + '%'
+  
+  if(anywhere) {
+    
+    query = '%' + query
+  }
+
+  doQuery(SEARCH_SPELLS, [query], (results) => {
+
+    for(var i in results) {
+
+      spells.push({
+        id: results[i].id,
+        name: results[i].name
+      })
+    }
+    
+    cb(spells)
+  })
+}
+
 function getSpellAttributes(spellId, cb) {
   
   var attributes = {}
@@ -205,6 +239,31 @@ app.get('/classes/all', function(req, res) {
   })
 })
 
+app.get('/classes/all2', function(req, res) {
+
+  var classes = []
+
+  getClasses(function(results) {
+
+    var count = results.length
+
+    for(var i in results) {
+
+      getClassAttributes(results[i], function(attribs, id) {
+
+        attribs.id = id
+        classes.push(attribs)
+
+        // make sure all async calls are done
+        if(!--count) {
+
+          res.json(classes)
+        }
+      })
+    }
+  })
+})
+
 app.get('/classes/:class', function(req, res) {
   
   var clazz = req.params.class
@@ -219,6 +278,17 @@ app.get('/classes/:class', function(req, res) {
     
     res.json({})
   }
+})
+
+app.get('/spells/search', (req, res) => {
+
+  var query = req.query.q || null
+  var anywhere = req.query.anywhere === '1' ? true : false
+  
+  searchSpells(query, anywhere, (results) => {
+  
+    res.json(results)
+  })
 })
 
 app.get('/spells/:spell', function(req, res) {
