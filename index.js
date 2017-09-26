@@ -19,13 +19,16 @@ var pool = new pg.Pool(db_conf)
 // QUERIES
 
 const SELECT_ALL_CLASSES = 'SELECT (id) FROM classes'
-const GET_CLASS_ATTRIBUTES = 'SELECT name FROM classes WHERE id=$1::int';
-const SELECT_ALL_SPELLS = 'SELECT (id) FROM spells';
-const SEARCH_SPELLS = ' SELECT id, name FROM spells WHERE name ILIKE $1 ORDER BY name';
-const GET_SPELL_ATTRIBUTES = 'SELECT name, type, casting_time, range, components, duration, primary_description, level FROM spells WHERE id=$1::int';
-const LEVELS_CLASS_GETS_SPELLS = 'SELECT DISTINCT (level) FROM class_spells WHERE class=$1::int ORDER BY level';
-const SPELLS_AT_LEVEL_FOR_CLASS_ID = 'SELECT class_spells.spell,spells.name FROM class_spells INNER JOIN spells ON spells.id=class_spells.spell WHERE class=$1::int AND class_spells.level=$2::int ORDER BY spells.name';
-const SPELLS_UPTO_LEVEL_FOR_CLASS_ID = 'SELECT class_spells.spell,spells.name FROM class_spells INNER JOIN spells ON spells.id=class_spells.spell WHERE class=$1::int AND class_spells.level<=$2::int ORDER BY spells.name';
+const GET_CLASS_ATTRIBUTES = 'SELECT name FROM classes WHERE id=$1::int'
+const SELECT_ALL_SPELLS = 'SELECT (id) FROM spells'
+const SEARCH_SPELLS = ' SELECT id, name FROM spells WHERE name ILIKE $1 ORDER BY name'
+const GET_SPELL_ATTRIBUTES = 'SELECT name, type, casting_time, range, components, duration, primary_description, level FROM spells WHERE id=$1::int'
+const LEVELS_CLASS_GETS_SPELLS = 'SELECT DISTINCT (level) FROM class_spells WHERE class=$1::int ORDER BY level'
+const SPELLS_AT_LEVEL_FOR_CLASS_ID = 'SELECT class_spells.spell,spells.name FROM class_spells INNER JOIN spells ON spells.id=class_spells.spell WHERE class=$1::int AND class_spells.level=$2::int ORDER BY spells.name'
+const SPELLS_UPTO_LEVEL_FOR_CLASS_ID = 'SELECT class_spells.spell,spells.name FROM class_spells INNER JOIN spells ON spells.id=class_spells.spell WHERE class=$1::int AND class_spells.level<=$2::int ORDER BY spells.name'
+const SELECT_ALL_USERS = 'SELECT (name) FROM users'
+const FIND_USER = 'SELECT id, name, spells FROM users where name ILIKE $1 LIMIT 1'
+const SAVE_USER = 'INSERT INTO users (name, spells) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET spells = excluded.spells'
 
 // SQL
 
@@ -196,6 +199,47 @@ function getSpellAttributes(spellId, cb) {
   })
 }
 
+function findUsers(cb) {
+  
+  var users = []
+  
+  doQuery(SELECT_ALL_USERS, [], function(results) {
+    
+    for(var i in results) {
+      
+      users.push(results[i].name)
+    }
+    
+    cb(users)
+  })
+}
+
+function findUser(name, cb) {
+  
+  var user = {}
+  
+  doQuery(FIND_USER, [name], function(results) {
+    
+    if(results.length === 1) {
+
+      user.id = results[0].id
+      user.name = results[0].name
+      var spells = results[0].spells
+      user.spells = spells ? spells.split(',') : []
+    }
+    
+    cb(user)
+  })
+}
+
+function saveUser(name, spells, cb) {
+  
+  doQuery(SAVE_USER, [name, spells], function(results) {
+    
+    cb({name, spells})
+  })
+}
+
 // HTTP
 // All requests return valid data assuming a valid input
 // Invalid data will result in an empty object/array being returned
@@ -355,6 +399,98 @@ app.get('/classes/:class/spells/:level/upto', function(req, res) {
     
     res.json({})
   }
+})
+
+app.get('/users', (req, res) => {
+  
+  findUsers((results) => {
+    
+    res.json(results)
+  })
+})
+
+app.get('/users/:user', (req, res) => {
+
+  var user = req.params.user
+
+  findUser(user, (userObj) => {
+  
+    res.json(userObj)
+  })
+})
+
+app.post('/users/:user/spells/:spell', (req, res) => {
+
+  var user = req.params.user
+  var spell = req.params.spell
+  
+  if(!spell.match(/^\d+$/)) {
+    res.json({})
+  }
+
+  spell = parseInt(spell)
+  
+  findUser(user, (userObj) => {
+  
+    if(userObj.id) {
+      
+      var spells = []
+      
+      if(userObj.spells) {
+        spells = JSON.parse(userObj.spells)
+      }
+      
+      var i = spells.indexOf(spell)
+      
+      if(i === -1) {
+        spells.push(spell)
+      }
+
+      saveUser(userObj.name, JSON.stringify(spells), (result) => {
+        res.json(result)
+      })
+    } else {
+      
+      res.json({})
+    }
+  })
+})
+
+app.delete('/users/:user/spells/:spell', (req, res) => {
+
+  var user = req.params.user
+  var spell = req.params.spell
+  
+  if(!spell.match(/^\d+$/)) {
+    res.json({})
+  }
+
+  spell = parseInt(spell)
+  
+  findUser(user, (userObj) => {
+  
+    if(userObj.id) {
+      
+      var spells = []
+      
+      if(userObj.spells) {
+        spells = JSON.parse(userObj.spells)
+      }
+      
+      var i = spells.indexOf(spell)
+      
+      if(i !== -1) {
+        spells.splice(i ,1)
+      }
+
+      saveUser(userObj.name, JSON.stringify(spells), (result) => {
+        res.json(result)
+      })
+    } else {
+      
+      res.json({})
+    }
+  })
 })
 
 app.listen(3000)
