@@ -152,6 +152,7 @@ function searchSpells(query, anywhere, cb) {
   if(query === null) {
     
     cb(spells)
+    return
   }
   
   query = query + '%'
@@ -328,9 +329,9 @@ app.get('/spells/search', (req, res) => {
 
   var query = req.query.q || null
   var anywhere = req.query.anywhere === '1' ? true : false
-  
+
   searchSpells(query, anywhere, (results) => {
-  
+
     res.json(results)
   })
 })
