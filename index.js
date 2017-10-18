@@ -404,25 +404,37 @@ app.get('/classes/:class/spells/:level/upto', function(req, res) {
 
 app.get('/users', (req, res) => {
   
-  findUsers((results) => {
+  if(user !== null) {
+
+    findUsers((results) => {
+      
+      res.json(results)
+    })
+  } else {
     
-    res.json(results)
-  })
+    res.json({})
+  }
 })
 
 app.get('/users/:user', (req, res) => {
 
-  var user = req.params.user
+  var user = req.params.user || null
 
-  findUser(user, (userObj) => {
-  
-    res.json(userObj)
-  })
+  if(user !== null) {
+
+    findUser(user, (userObj) => {
+    
+      res.json(userObj)
+    })
+  } else {
+    
+    res.json({})
+  }
 })
 
 app.post('/users/:user', (req, res) => {
   
-  var user = req.params.user
+  var user = req.params.user || null
 
   saveUser(user, "[]", (result) => {
     res.json(result)
@@ -431,11 +443,12 @@ app.post('/users/:user', (req, res) => {
 
 app.post('/users/:user/spells/:spell', (req, res) => {
 
-  var user = req.params.user
+  var user = req.params.user || null
   var spell = req.params.spell
   
-  if(!spell.match(/^\d+$/)) {
+  if(!spell.match(/^\d+$/) || user === null) {
     res.json({})
+    return
   }
 
   spell = parseInt(spell)
@@ -468,11 +481,12 @@ app.post('/users/:user/spells/:spell', (req, res) => {
 
 app.delete('/users/:user/spells/:spell', (req, res) => {
 
-  var user = req.params.user
+  var user = req.params.user || null
   var spell = req.params.spell
   
-  if(!spell.match(/^\d+$/)) {
+  if(!spell.match(/^\d+$/) || user === null) {
     res.json({})
+    return
   }
 
   spell = parseInt(spell)
