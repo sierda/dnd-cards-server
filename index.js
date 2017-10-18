@@ -420,6 +420,15 @@ app.get('/users/:user', (req, res) => {
   })
 })
 
+app.post('/users/:user', (req, res) => {
+  
+  var user = req.params.user
+
+  saveUser(user, "[]", (result) => {
+    res.json(result)
+  })
+})
+
 app.post('/users/:user/spells/:spell', (req, res) => {
 
   var user = req.params.user
